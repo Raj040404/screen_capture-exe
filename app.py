@@ -1,16 +1,34 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, scrolledtext
 import threading
 import subprocess
 import sys
-from screen_ocr import start_recording, stop_recording
+from screen_ocr import start_recording, stop_recording, query, process_with_ollama
+import pkg_resources
 
 # Start/Stop flag
 is_recording = False
 
 def install_requirements():
-    # Automatically install requirements from requirements.txt
-    subprocess.call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+    """
+    Automatically install requirements from requirements.txt if not already installed.
+    """
+    # Read requirements from the requirements.txt file
+    with open("requirements.txt") as f:
+        required_packages = f.read().splitlines()
+    
+    # Find out which packages are already installed
+    installed_packages = {pkg.key for pkg in pkg_resources.working_set}
+    
+    # Identify packages that are not yet installed
+    to_install = [pkg for pkg in required_packages if pkg.lower().split('==')[0] not in installed_packages]
+
+    # If there are packages to install, proceed with the installation
+    if to_install:
+        print("Installing missing packages:", to_install)
+        subprocess.call([sys.executable, "-m", "pip", "install", *to_install])
+    else:
+        print("All required packages are already installed.")
 
 def start_recording_from_gui():
     global is_recording
@@ -36,9 +54,20 @@ def stop_recording_from_gui():
     stop_button.config(state=tk.DISABLED)
     progress_label.config(text="Recording Stopped.")
 
+def fetch_file_content():
+    try:
+        with open('text.txt', 'r') as file:
+            content = file.read()
+            display_text.delete(1.0, tk.END)  # Clear previous content
+            display_text.insert(tk.END, content)  # Insert new content
+    except FileNotFoundError:
+        messagebox.showerror("Error", "The file 'text.txt' was not found.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
 # Set up the main application window
 app = tk.Tk()
-app.title("Futuristic Screen Recorder")
+app.title("Screen Recorder")
 app.state('zoomed')  # Start the window maximized
 
 # Custom Styles
@@ -86,9 +115,17 @@ start_button.grid(row=0, column=0, padx=20, pady=10)
 stop_button = ttk.Button(button_frame, text="Stop Recording", command=stop_recording_from_gui, state=tk.DISABLED)
 stop_button.grid(row=0, column=1, padx=20, pady=10)
 
+# Fetch File Content Button
+fetch_button = ttk.Button(button_frame, text="Fetch File Content", command=fetch_file_content)
+fetch_button.grid(row=0, column=2, padx=20, pady=10)
+
 # Progress Label
 progress_label = ttk.Label(app, text="")
 progress_label.pack(pady=10)
+
+# Display Text Area for File Content
+display_text = scrolledtext.ScrolledText(app, width=80, height=20, font=("Segoe UI", 14))
+display_text.pack(pady=20)
 
 # Top-Level Frame for Custom Control Buttons
 control_frame = tk.Frame(app, bg="#1c1c1e")
